@@ -37,10 +37,18 @@
 #include <linux/slab.h>
 #include <mach/board.h>
 
+#if 0
 #define DPS(x...) printk(KERN_DEBUG "[PS][ISL29028] " x)
 #define DLS(x...) printk(KERN_DEBUG "[LS][ISL29028] " x)
 #define IPS(x...) printk(KERN_INFO "[PS][ISL29028] " x)
 #define ILS(x...) printk(KERN_INFO "[LS][ISL29028] " x)
+#else
+#define DPS(x...)
+#define DLS(x...)
+#define IPS(x...)
+#define ILS(x...)
+#endif
+
 #define EPS(x...) printk(KERN_ERR "[PS][ISL29028 ERROR] " x)
 #define ELS(x...) printk(KERN_ERR "[LS][ISL29028 ERROR] " x)
 
@@ -464,8 +472,6 @@ static void report_psensor_input_event(struct isl29028_info *lpi,
 		ISL29028_INTERRUPT, ISL29028_INT_ALS_FLAG);
 	if (ret < 0)
 		EPS("%s: clear lsensor intr flag fail\n", __func__);
-
-	wake_lock_timeout(&(lpi->ps_wake_lock), 2*HZ);
 }
 
 static void report_lsensor_input_event(struct isl29028_info *lpi)
@@ -666,8 +672,11 @@ static void sensor_irq_do_work(struct work_struct *work)
 	char buffer[2];
 	int ret = 0;
 	int value1 = -1;
+	static int count;
 
 	uint16_t ps_adc = 0;
+
+	wake_lock_timeout(&(lpi->ps_wake_lock), 3*HZ);
 
 	value1 = gpio_get_value(lpi->intr_pin);
 	/*DPS("%s: lpi->intr_pin = %d\n", __func__, value1);*/
@@ -675,8 +684,18 @@ static void sensor_irq_do_work(struct work_struct *work)
 	buffer[0] = ISL29028_INTERRUPT;
 	ret = I2C_RxData(buffer, 1);
 	if (ret < 0) {
-		EPS("%s: I2C_RxData fail (ISL29028_INTERRUPT)\n",
-			__func__);
+		EPS("%s: I2C_RxData %d fail (ISL29028_INTERRUPT)\n",
+			__func__, count);
+
+		if (count < 5)
+			count++;
+		else {
+			count = 0;
+			input_report_abs(lpi->ps_input_dev, ABS_DISTANCE, 1);
+			input_sync(lpi->ps_input_dev);
+			blocking_notifier_call_chain(&psensor_notifier_list, 3, NULL);
+		}
+
 		enable_irq(lpi->irq);
 		return;
 	}
@@ -685,8 +704,18 @@ static void sensor_irq_do_work(struct work_struct *work)
 	buffer[0] = ISL29028_CONFIGURE;
 	ret = I2C_RxData(buffer, 1);
 	if (ret < 0) {
-		EPS("%s: I2C_RxData fail (ISL29028_CONFIGURE)\n",
-			__func__);
+		EPS("%s: I2C_RxData %d fail (ISL29028_CONFIGURE)\n",
+			__func__, count);
+
+		if (count < 5)
+			count++;
+		else {
+			count = 0;
+			input_report_abs(lpi->ps_input_dev, ABS_DISTANCE, 1);
+			input_sync(lpi->ps_input_dev);
+			blocking_notifier_call_chain(&psensor_notifier_list, 3, NULL);
+		}
+
 		enable_irq(lpi->irq);
 		return;
 	}
@@ -736,6 +765,8 @@ static void sensor_irq_do_work(struct work_struct *work)
 	check_and_recover(lpi);
 
 	enable_irq(lpi->irq);
+
+	count = 0;
 }
 
 static void report_near_do_work(struct work_struct *w)
@@ -754,7 +785,6 @@ static void report_near_do_work(struct work_struct *w)
 		EPS("%s: clear lsensor intr flag fail\n", __func__);
 
 	blocking_notifier_call_chain(&psensor_notifier_list, 2, NULL);
-	wake_lock_timeout(&(lpi->ps_wake_lock), 2*HZ);
 }
 
 /*#ifdef DEBUG_PROXIMITY*/
@@ -973,7 +1003,8 @@ static irqreturn_t isl29028_irq_handler(int irq, void *data)
 		IPS("%s\n", __func__);
 
 	disable_irq_nosync(lpi->irq);
-	queue_work_on(0, lpi->lp_wq, &sensor_irq_work);
+
+	queue_work(lpi->lp_wq, &sensor_irq_work);
 
 	return IRQ_HANDLED;
 }
@@ -1588,7 +1619,6 @@ static ssize_t ps_test_mode_store(struct device *dev,
 {
 	char buffer[2] = "";
 	int test1 = 0, test2 = 0;
-	int value = 0;
 	int ret;
 
 	sscanf(buf, "0x%02x 0x%02x", &test1, &test2);
