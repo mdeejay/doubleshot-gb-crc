@@ -153,7 +153,7 @@ static unsigned int doubleshot_wifi_status(struct device *dev)
 }
 
 static struct mmc_platform_data doubleshot_wifi_data = {
-        .ocr_mask               = MMC_VDD_28_29,
+        .ocr_mask               = MMC_VDD_21_22,
         .status                 = doubleshot_wifi_status,
         .register_status_notify = doubleshot_wifi_status_register,
         .embedded_sdio          = &doubleshot_wifi_emb_data,
