@@ -24,6 +24,7 @@
 #include <linux/io.h>
 #include <linux/spinlock.h>
 #include <linux/delay.h>
+#include <linux/clk.h>
 #include <mach/msm_iomap.h>
 #include <mach/clk.h>
 #include <mach/msm_xo.h>
@@ -578,6 +579,33 @@ static void set_rate_div_banked(struct clk_local *clk, struct clk_freq_tbl *nf)
  * Clock Descriptions
  */
 
+/* ADM */
+#define CLK_ADM(id, br, h_r, h_c, h_b, tv) \
+	[L_##id##_CLK] = { \
+		.type = BASIC, \
+		.ns_reg = SC0_U_CLK_BRANCH_ENA_VOTE_REG, \
+		.cc_reg = SC0_U_CLK_BRANCH_ENA_VOTE_REG, \
+		.halt_reg = h_r, \
+		.halt_check = h_c, \
+		.halt_bit = h_b, \
+		.br_en_mask = br, \
+		.set_rate = set_rate_nop, \
+		.freq_tbl = clk_tbl_adm, \
+		.parent = L_NONE_CLK, \
+		.test_vector = tv, \
+		.current_freq = &local_dummy_freq, \
+	}
+#define F_ADM(f, s, v) \
+	{ \
+		.freq_hz = f, \
+		.src = SRC_##s, \
+		.sys_vdd = v, \
+	}
+static struct clk_freq_tbl clk_tbl_adm[] = {
+	F_ADM(1, BB_PXO, NONE),
+	F_END,
+};
+
 /* GSBI_UART */
 #define CLK_GSBI_UART(id, n, h_r, h_c, h_b, tv) \
 	[L_##id##_CLK] = { \
@@ -1095,8 +1123,8 @@ static struct clk_freq_tbl clk_tbl_gfx2d[] = {
 	F_GFX2D(145455000, MM_PLL1,  2, 11, NOMINAL),
 	F_GFX2D(160000000, MM_PLL1,  1,  5, NOMINAL),
 	F_GFX2D(177778000, MM_PLL1,  2,  9, NOMINAL),
-	F_GFX2D(228570000, MM_PLL1,  1,  4, NOMINAL),
-	F_GFX2D(266667000, MM_PLL1,  2,  7, HIGH),
+	F_GFX2D(200000000, MM_PLL1,  1,  4, NOMINAL),
+	F_GFX2D(228571000, MM_PLL1,  2,  7, HIGH),
 	F_END,
 };
 
@@ -1160,9 +1188,11 @@ static struct clk_freq_tbl clk_tbl_gfx3d[] = {
 	F_GFX3D(160000000, MM_PLL1,  1,  5, NOMINAL),
 	F_GFX3D(177778000, MM_PLL1,  2,  9, NOMINAL),
 	F_GFX3D(200000000, MM_PLL1,  1,  4, NOMINAL),
+//	F_GFX3D(228571000, MM_PLL1,  2,  7, NOMINAL),
 	F_GFX3D(266667000, MM_PLL1,  2,  7, NOMINAL),
-	F_GFX3D(320000000, MM_PLL1,  1,  3, HIGH),
-	F_GFX3D(320000000, MM_PLL1,  2,  5, HIGH),
+//	F_GFX3D(266667000, MM_PLL1,  1,  3, HIGH),
+        F_GFX3D(320000000, MM_PLL1,  1,  3, HIGH),
+//	F_GFX3D(320000000, MM_PLL1,  2,  5, HIGH),
 	F_END,
 };
 
@@ -1245,8 +1275,8 @@ static struct clk_freq_tbl clk_tbl_jpegd[] = {
 	F_JPEGD( 64000000, MM_GPERF, 6, LOW),
 	F_JPEGD( 76800000, MM_GPERF, 5, LOW),
 	F_JPEGD( 96000000, MM_GPERF, 4, LOW),
-	F_JPEGD(200000000, MM_PLL1,  5, NOMINAL),
-	F_JPEGD(228570000, MM_PLL1,  4, NOMINAL),
+	F_JPEGD(160000000, MM_PLL1,  5, NOMINAL),
+	F_JPEGD(200000000, MM_PLL1,  4, NOMINAL),
 	F_END,
 };
 
@@ -1390,7 +1420,6 @@ static struct clk_freq_tbl clk_tbl_pixel_mdp[] = {
 	F_PIXEL_MDP( 64000000, MM_GPERF, 2,   1,   3, LOW),
 	F_PIXEL_MDP( 69300000, MM_GPERF, 1, 231, 1280, LOW),
 	F_PIXEL_MDP(69818000, MM_GPERF, 1,   2,  11, LOW),
-	F_PIXEL_MDP(71100000, MM_GPERF, 1, 237, 1280, LOW), /*(pll/pre_div)*(Md/Ns)=(384/1)*(237/1280)=384*(237/1280)=71.1 */
 	F_PIXEL_MDP(71200000, MM_GPERF, 1,   89, 480, LOW), /*(pll/pre_div)*(Md/Ns)=(384/1)*(89/480)=384*(89/480)=71.2 */
 	F_PIXEL_MDP(76800000, MM_GPERF, 1,   1,   5, LOW),
 	F_PIXEL_MDP( 85333000, MM_GPERF, 1,   2,    9, LOW),
@@ -1926,15 +1955,13 @@ struct clk_local soc_clk_local_tbl[] = {
 		CLK_HALT_DFAB_STATE_REG, HALT,  7, TEST_PER_LS(0x1A)),
 
 	/* HW-Voteable Clocks */
-	CLK_NORATE(ADM0, SC0_U_CLK_BRANCH_ENA_VOTE_REG, BIT(2), NULL, 0,
-		CLK_HALT_MSS_SMPSS_MISC_STATE_REG, HALT_VOTED, 14,
+	CLK_ADM(ADM0, BIT(2), CLK_HALT_MSS_SMPSS_MISC_STATE_REG, HALT_VOTED, 14,
 		TEST_PER_HS(0x2A)),
+	CLK_ADM(ADM1, BIT(4), CLK_HALT_MSS_SMPSS_MISC_STATE_REG, HALT_VOTED, 12,
+		TEST_PER_HS(0x2B)),
 	CLK_NORATE(ADM0_P, SC0_U_CLK_BRANCH_ENA_VOTE_REG, BIT(3), NULL, 0,
 		CLK_HALT_MSS_SMPSS_MISC_STATE_REG, HALT_VOTED, 13,
 		TEST_PER_LS(0x80)),
-	CLK_NORATE(ADM1, SC0_U_CLK_BRANCH_ENA_VOTE_REG, BIT(4), NULL, 0,
-		CLK_HALT_MSS_SMPSS_MISC_STATE_REG, HALT_VOTED, 12,
-		TEST_PER_HS(0x2B)),
 	CLK_NORATE(ADM1_P, SC0_U_CLK_BRANCH_ENA_VOTE_REG, BIT(5), NULL, 0,
 		CLK_HALT_MSS_SMPSS_MISC_STATE_REG, HALT_VOTED, 11,
 		TEST_PER_LS(0x81)),
@@ -2554,6 +2581,8 @@ void __init msm_clk_soc_init(void)
 	reg_init();
 
 	/* Initialize rates for clocks that only support one. */
+	local_clk_set_rate(C(ADM0), 1);
+	local_clk_set_rate(C(ADM1), 1);
 	local_clk_set_rate(C(PDM), 27000000);
 	local_clk_set_rate(C(PRNG), 64000000);
 	local_clk_set_rate(C(MDP_VSYNC), 27000000);
@@ -2577,7 +2606,25 @@ void msm_clk_soc_set_ignore_list(int *ignore_clk, unsigned num_ignore_clk)
 
 static int msm_clk_soc_late_init(void)
 {
-	return local_unvote_sys_vdd(HIGH);
+	int rc;
+
+	/* Vote for MMFPB to be at least 64MHz when an Apps CPU is active. */
+	struct clk *mmfpb_a_clk = clk_get(NULL, "mmfpb_a_clk");
+	if (WARN(IS_ERR(mmfpb_a_clk), "mmfpb_a_clk not found (%ld)\n",
+			PTR_ERR(mmfpb_a_clk)))
+		return PTR_ERR(mmfpb_a_clk);
+	rc = clk_set_min_rate(mmfpb_a_clk, 64000000);
+	if (WARN(rc, "mmfpb_a_clk rate was not set (%d)\n", rc))
+		return rc;
+	rc = clk_enable(mmfpb_a_clk);
+	if (WARN(rc, "mmfpb_a_clk not enabled (%d)\n", rc))
+		return rc;
+
+	/* Remove temporary vote for HIGH vdd_dig. */
+	rc = local_unvote_sys_vdd(HIGH);
+	WARN(rc, "local_unvote_sys_vdd(HIGH) failed (%d)\n", rc);
+
+	return rc;
 }
 late_initcall(msm_clk_soc_late_init);
 
