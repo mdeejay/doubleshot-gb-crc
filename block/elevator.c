@@ -223,7 +223,8 @@ static struct elevator_queue *elevator_alloc(struct request_queue *q,
 
 	return eq;
 err:
-	kfree(eq);
+	if (eq)
+		kfree(eq);
 	elevator_put(e);
 	return NULL;
 }

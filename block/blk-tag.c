@@ -133,7 +133,8 @@ init_tag_map(struct request_queue *q, struct blk_queue_tag *tags, int depth)
 
 	return 0;
 fail:
-	kfree(tag_index);
+	if (tag_index)
+		kfree(tag_index);
 	return -ENOMEM;
 }
 
@@ -152,7 +153,8 @@ static struct blk_queue_tag *__blk_queue_init_tags(struct request_queue *q,
 	atomic_set(&tags->refcnt, 1);
 	return tags;
 fail:
-	kfree(tags);
+	if (tags)
+		kfree(tags);
 	return NULL;
 }
 
@@ -204,7 +206,8 @@ int blk_queue_init_tags(struct request_queue *q, int depth,
 	INIT_LIST_HEAD(&q->tag_busy_list);
 	return 0;
 fail:
-	kfree(tags);
+	if (tags)
+		kfree(tags);
 	return -ENOMEM;
 }
 EXPORT_SYMBOL(blk_queue_init_tags);

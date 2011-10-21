@@ -349,7 +349,8 @@ void unregister_blkdev(unsigned int major, const char *name)
 		*n = p->next;
 	}
 	mutex_unlock(&block_class_lock);
-	kfree(p);
+	if (p)
+		kfree(p);
 }
 
 EXPORT_SYMBOL(unregister_blkdev);

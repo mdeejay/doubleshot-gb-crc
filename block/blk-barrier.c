@@ -320,6 +320,11 @@ int blkdev_issue_flush(struct block_device *bdev, gfp_t gfp_mask,
 		return -ENXIO;
 
 	bio = bio_alloc(gfp_mask, 0);
+
+	if (!bio) {
+		printk(KERN_ERR "%s: bio_alloc fail\n", __func__);
+		return -ENXIO;
+	}
 	bio->bi_end_io = bio_end_empty_barrier;
 	bio->bi_bdev = bdev;
 	if (test_bit(BLKDEV_WAIT, &flags))
